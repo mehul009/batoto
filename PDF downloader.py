@@ -11,9 +11,12 @@ import re
 import os
 from PIL import Image
 from PyPDF2 import PdfMerger
-from fpdf import FPDF
+#from fpdf import FPDF
 import shutil
+from PyQt5.QtWidgets import QApplication, QInputDialog, QLineEdit, QFileDialog
+import sys
 
+#website extracter
 def get_links(url):  
     """
     Extract all links from a webpage
@@ -27,6 +30,7 @@ def get_links(url):
             links.append(link.get('href'))
     return links
 
+#folder deleter after converted to pdf
 def delete_folder(folder_path):
     # this is to delet all the files at the end
     if os.path.exists(folder_path):
@@ -35,8 +39,37 @@ def delete_folder(folder_path):
     else:
         print(f"Folder '{folder_path}' does not exist.")
 
+#URl asker
+def get_user_input(lbl, lbl2="input"):
+    app = QApplication(sys.argv)
+    
+    # Create a QLineEdit for user input
+    input_field = QLineEdit()
+    
+    # Open a dialog box to get user input
+    input_text, ok = QInputDialog.getText(None, lbl, lbl2, QLineEdit.EchoMode.Normal, input_field.text())
+    
+    if ok:
+        # Return the user input
+        return input_text
+    else:
+        # If user cancels, return None
+        return None
 
-url = "https://bato.to/series/137919/the-hole-diary"  # series directory
+#special character removar for path
+def replace_special_chars(input_string):
+    special_characters = ["<", ">", ":", '"', "/", "\\", "|", "?", "*"]
+    for char in special_characters:
+        input_string = input_string.replace(char, '-')
+    return input_string
+
+#output folder selector
+def select_folder():
+    app = QApplication(sys.argv)
+    folder_path = QFileDialog.getExistingDirectory()
+    return folder_path
+
+url = get_user_input("Manga Url","Enter Batoto series link:") #"https://bato.to/series/137919/the-hole-diary"  # series directory
 
 #we will use pyqt box here to get url in future
 
@@ -58,6 +91,8 @@ filtered_links.sort()
 #now we have all the chapter list
 
 path_list = [] # just storage for all the path
+
+loc = select_folder()
 
 
 # for all chapter
@@ -87,7 +122,7 @@ for url_short in filtered_links:
             chapter = local_text_epi_value[1:-1]
         
     #simple path
-    path = str(series)+' '+str(chapter)
+    path = loc+ '/' + replace_special_chars(series)+' '+ replace_special_chars(chapter)
     path_list.append(path)
     
     #let's make new folder for each chapter
@@ -116,7 +151,7 @@ for url_short in filtered_links:
         for file in pdf_files:
             merger.append(file)
             
-        with open(str(series)+' '+str(chapter)+'.pdf', 'wb') as f:
+        with open(loc+ '/' + replace_special_chars(series)+' '+replace_special_chars(chapter)+'.pdf', 'wb') as f:
             merger.write(f)
     
 # this require some updates
