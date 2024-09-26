@@ -263,25 +263,29 @@ for url_short in filtered_links:
         image_name = str(name)
         if download_image(image_url, path, image_name):
             # Image downloaded successfully
-            img = Image.open(f"{path}/{image_name}")
-            img.save(f"{path}/{image_name}" + '.pdf', 'PDF')
+            with Image.open(f"{path}/{image_name}") as img:
+                img.save(f"{path}/{image_name}.pdf", 'PDF')
+                img.close()
         else:
             # Image download failed, but a blank image with the URL was created
-            img = Image.open(f"{path}/{image_name}")
-            img.save(f"{path}/{image_name}" + '.pdf', 'PDF') 
-            
-        name = name + 1       
-        image = Image.open(f"{path}/{image_name}")
-        image.save(f"{path}/{image_name}"+'.pdf','PDF')
-        pdf_files.append(f"{path}/{image_name}"+'.pdf')
-        image.close()
+            with Image.open(f"{path}/{image_name}") as img:
+                img.save(f"{path}/{image_name}.pdf", 'PDF')
+                img.close()
+    
+        name += 1
+        with Image.open(f"{path}/{image_name}") as image:
+            image.save(f"{path}/{image_name}.pdf", 'PDF')
+            pdf_files.append(f"{path}/{image_name}.pdf")
+            image.close()
         
         merger = PdfMerger()
         for file in pdf_files:
             merger.append(file)
-            
-        with open(loc+ '/' + replace_special_chars(series)+' '+replace_special_chars(chapter)+'.pdf', 'wb') as f:
+    
+        with open(f"{loc}/{replace_special_chars(series)} {replace_special_chars(chapter)}.pdf", 'wb') as f:
             merger.write(f)
+        merger.close()
+        f.close()
     
 #this require some updates
 for path in path_list:
