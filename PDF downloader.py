@@ -9,12 +9,15 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import os
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont, ImageFile
 from PyPDF2 import PdfMerger
-#from fpdf import FPDF
 import shutil
-from PyQt5.QtWidgets import QApplication, QInputDialog, QLineEdit, QFileDialog
+from PyQt5.QtWidgets import QApplication, QInputDialog, QFileDialog, QWidget, QPushButton, QLabel, QLineEdit, QVBoxLayout, QCheckBox
 import sys
+import time
+import urllib.request
+import wget
+import pycurl
 
 #website extracter
 def get_links(url):  
@@ -31,15 +34,23 @@ def get_links(url):
     return links
 
 #folder deleter after converted to pdf
-def delete_folder(folder_path):
-    # this is to delet all the files at the end
+def delete_folder(folder_path, retries=3, delay=1):
+    # This is to delete all the files at the end
     if os.path.exists(folder_path):
-        shutil.rmtree(folder_path)
-        print(f"Folder '{folder_path}' and its contents have been deleted.")
+        for attempt in range(retries):
+            try:
+                shutil.rmtree(folder_path)
+                print(f"Folder '{folder_path}' and its contents have been deleted.")
+                break
+            except PermissionError as e:
+                print(f"Attempt {attempt + 1} failed: {e}")
+                time.sleep(delay)
+        else:
+            print(f"Failed to delete folder '{folder_path}' after {retries} attempts.")
     else:
         print(f"Folder '{folder_path}' does not exist.")
 
-#URl asker
+#URL asker
 def get_user_input(lbl, lbl2="input"):
     app = QApplication(sys.argv)
     
@@ -56,7 +67,7 @@ def get_user_input(lbl, lbl2="input"):
         # If user cancels, return None
         return None
 
-#special character removar for path
+#special character remover for path
 def replace_special_chars(input_string):
     special_characters = ["<", ">", ":", '"', "/", "\\", "|", "?", "*"]
     for char in special_characters:
@@ -69,9 +80,120 @@ def select_folder():
     folder_path = QFileDialog.getExistingDirectory()
     return folder_path
 
-url = get_user_input("Manga Url","Enter Batoto series link:") #"https://bato.to/series/137919/the-hole-diary"  # series directory
+#chapter selector windows
+class InputWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.initUI()
+        self.result = None
 
-#we will use pyqt box here to get url in future
+    def initUI(self):
+        self.setWindowTitle('Chapter Input')
+        layout = QVBoxLayout()
+
+        self.all_checkbox = QCheckBox('Include all chapters')
+        layout.addWidget(self.all_checkbox)
+
+        self.start_label = QLabel('Enter the start chapter number:')
+        layout.addWidget(self.start_label)
+        self.start_input = QLineEdit()
+        self.start_input.setText('0')  # Set default value to 0
+        layout.addWidget(self.start_input)
+
+        self.end_label = QLabel('Enter the end chapter number:')
+        layout.addWidget(self.end_label)
+        self.end_input = QLineEdit()
+        self.end_input.setText('0')  # Set default value to 0
+        layout.addWidget(self.end_input)
+
+        self.submit_button = QPushButton('Submit')
+        self.submit_button.clicked.connect(self.submit)
+        layout.addWidget(self.submit_button)
+
+        self.setLayout(layout)
+
+    def submit(self):
+        all_chapters = self.all_checkbox.isChecked()
+        start_chapter = int(self.start_input.text())
+        end_chapter = int(self.end_input.text())
+        self.result = (all_chapters, start_chapter, end_chapter)
+        self.close()
+
+def chapter_selector():
+    app = QApplication(sys.argv)
+    window = InputWindow()
+    window.show()
+    app.exec()
+    return window.result
+# chapter selector end
+
+#image downloader
+def download_image(url, path, image_name):
+    # Try downloading with requests
+    for attempt in range(3):
+        try:
+            response = requests.get(url, stream=True)
+            response.raise_for_status()  # Raise an exception for 4xx or 5xx status codes
+
+            with open(f"{path}/{image_name}", 'wb') as f:
+                for chunk in response.iter_content(1024):
+                    f.write(chunk)
+
+            # Verify the image integrity
+            try:
+                img = Image.open(f"{path}/{image_name}")
+                img.verify()  # Raises an exception if the image is corrupted
+                return True
+            except IOError as e:
+                print(f"Error verifying image: {e}")
+                time.sleep(60)  # Wait for 1 minute before retrying
+        except requests.RequestException as e:
+            print(f"Error downloading image with requests: {e}")
+            time.sleep(60)  # Wait for 1 minute before retrying
+
+    # Try downloading with urllib
+    try:
+        urllib.request.urlretrieve(url, f"{path}/{image_name}")
+        img = Image.open(f"{path}/{image_name}")
+        img.verify()  # Raises an exception if the image is corrupted
+        return True
+    except Exception as e:
+        print(f"Error downloading image with urllib: {e}")
+
+    # Try downloading with wget
+    try:
+        wget.download(url, f"{path}/{image_name}")
+        img = Image.open(f"{path}/{image_name}")
+        img.verify()  # Raises an exception if the image is corrupted
+        return True
+    except Exception as e:
+        print(f"Error downloading image with wget: {e}")
+
+    # Try downloading with pycurl
+    try:
+        c = pycurl.Curl()
+        c.setopt(pycurl.URL, url)
+        with open(f"{path}/{image_name}", 'wb') as f:
+            c.setopt(pycurl.WRITEFUNCTION, f.write)
+            c.perform()
+        c.close()
+        img = Image.open(f"{path}/{image_name}")
+        img.verify()  # Raises an exception if the image is corrupted
+        return True
+    except Exception as e:
+        print(f"Error downloading image with pycurl: {e}")
+
+    # If all else fails, create a blank image with the URL written on it
+    img = Image.new('RGB', (400, 200), color = (73, 109, 137))
+    font = ImageFont.load_default()
+    draw = ImageDraw.Draw(img)
+    draw.text((10,10), url, font=font)
+    img.save(f"{path}/{image_name}")
+
+    return False
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+url = get_user_input("Manga URL","Enter Batoto series link:")  # series directory
 
 
 links = get_links(url) #this will downalod every link from the above url
@@ -86,16 +208,23 @@ for lnk in links:
             if substrings[1] == 'chapter':
                 filtered_links.append(lnk)
                 
-filtered_links.sort()  
-
-#now we have all the chapter list
+filtered_links.sort()  #now we have all the chapter list
 
 path_list = [] # just storage for all the path
 
-loc = select_folder()
+loc = select_folder() # folder selector
 
+# let's ask user for how many chapter they want to downlaod
+Result = chapter_selector()
+all_selected = Result[0]
+start_chapter = Result[1]
+end_chapter = Result[2]
 
-# for all chapter
+# for all chapter 
+if all_selected == False:
+    filtered_links = filtered_links[start_chapter -1:end_chapter-1]
+    
+#let's get image for the chapter
 for url_short in filtered_links:
     url = "https://bato.to"+url_short
     response = requests.get(url)
@@ -121,7 +250,6 @@ for url_short in filtered_links:
             series = local_text_sub_value[1:-1]
             chapter = local_text_epi_value[1:-1]
         
-    #simple path
     path = loc+ '/' + replace_special_chars(series)+' '+ replace_special_chars(chapter)
     path_list.append(path)
     
@@ -130,18 +258,19 @@ for url_short in filtered_links:
     
     pdf_files = [] # PDF holder
     name = 1 # image name holder
+    
     for image_url in img_https_list:
-        response = requests.get(image_url)
-        # Check if the request was successful
-        if response.status_code == 200:
-        # Get the image file name from the URL
-            image_name = str(name)
-            name = name + 1
-        
-        # Save the image to the current directory
-            with open(f"{path}/{image_name}", "wb") as f:
-                f.write(response.content)
-                
+        image_name = str(name)
+        if download_image(image_url, path, image_name):
+            # Image downloaded successfully
+            img = Image.open(f"{path}/{image_name}")
+            img.save(f"{path}/{image_name}" + '.pdf', 'PDF')
+        else:
+            # Image download failed, but a blank image with the URL was created
+            img = Image.open(f"{path}/{image_name}")
+            img.save(f"{path}/{image_name}" + '.pdf', 'PDF') 
+            
+        name = name + 1       
         image = Image.open(f"{path}/{image_name}")
         image.save(f"{path}/{image_name}"+'.pdf','PDF')
         pdf_files.append(f"{path}/{image_name}"+'.pdf')
@@ -154,6 +283,6 @@ for url_short in filtered_links:
         with open(loc+ '/' + replace_special_chars(series)+' '+replace_special_chars(chapter)+'.pdf', 'wb') as f:
             merger.write(f)
     
-# this require some updates
+#this require some updates
 for path in path_list:
     delete_folder(path)
