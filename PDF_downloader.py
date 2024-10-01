@@ -192,6 +192,14 @@ def download_image(url, path, image_name):
 
     return False
 
+#function for number adding for easy sorting
+def chap_no(chap):
+    if len(chap[3:])==1:
+        return "0" + str(chap[3:])
+    else:
+        return str(chap[3:])
+    
+    
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 url = get_user_input("Manga URL","Enter Batoto series link:")  # series directory
 
@@ -282,7 +290,7 @@ for url_short in filtered_links:
         for file in pdf_files:
             merger.append(file)
     
-        with open(f"{loc}/{replace_special_chars(series)} {replace_special_chars(chapter)}.pdf", 'wb') as f:
+        with open(f"{loc}/{chap_no(chapter)} {replace_special_chars(series)} {replace_special_chars(chapter)}.pdf", 'wb') as f:
             merger.write(f)
         merger.close()
         f.close()
