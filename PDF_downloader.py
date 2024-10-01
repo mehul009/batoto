@@ -12,7 +12,7 @@ import os
 from PIL import Image, ImageDraw, ImageFont, ImageFile
 from PyPDF2 import PdfMerger
 import shutil
-from PyQt5.QtWidgets import QApplication, QInputDialog, QFileDialog, QWidget, QPushButton, QLabel, QLineEdit, QVBoxLayout, QCheckBox
+from PyQt5.QtWidgets import QApplication, QInputDialog, QFileDialog, QWidget, QPushButton, QLabel, QLineEdit, QVBoxLayout, QCheckBox, QListWidget, QComboBox
 import sys
 import time
 import urllib.request
@@ -31,7 +31,18 @@ def get_links(url):
         href = link.get('href')
         if link:
             links.append(link.get('href'))
-    return links
+            
+    episode_links = soup.find_all('a', class_='visited chapt')
+    episode_list = [] 
+    
+    for link in episode_links:
+        ls = link.get_text()
+        ls = ls[1:-1]
+        episode_list.append(ls)
+    
+    episode_list.reverse()
+        
+    return links, episode_list
 
 #folder deleter after converted to pdf
 def delete_folder(folder_path, retries=3, delay=1):
@@ -80,31 +91,37 @@ def select_folder():
     folder_path = QFileDialog.getExistingDirectory()
     return folder_path
 
-#chapter selector windows
-class InputWindow(QWidget):
-    def __init__(self):
+#Chapter selector window start
+class ChapterSelectorWindow(QWidget):
+    def __init__(self, chapters):
         super().__init__()
+        self.chapters = chapters
         self.initUI()
         self.result = None
 
     def initUI(self):
-        self.setWindowTitle('Chapter Input')
+        self.setWindowTitle('Chapter Selector')
         layout = QVBoxLayout()
 
         self.all_checkbox = QCheckBox('Include all chapters')
         layout.addWidget(self.all_checkbox)
 
-        self.start_label = QLabel('Enter the start chapter number:')
+        self.start_label = QLabel('Start chapter:')
         layout.addWidget(self.start_label)
-        self.start_input = QLineEdit()
-        self.start_input.setText('0')  # Set default value to 0
-        layout.addWidget(self.start_input)
+        self.start_combo = QComboBox()
+        self.start_combo.addItems([str(i) for i in self.chapters])
+        layout.addWidget(self.start_combo)
 
-        self.end_label = QLabel('Enter the end chapter number:')
+        self.end_label = QLabel('End chapter:')
         layout.addWidget(self.end_label)
-        self.end_input = QLineEdit()
-        self.end_input.setText('0')  # Set default value to 0
-        layout.addWidget(self.end_input)
+        self.end_combo = QComboBox()
+        self.end_combo.addItems([str(i) for i in self.chapters])
+        layout.addWidget(self.end_combo)
+
+        self.selected_chapters_label = QLabel('Selected Chapters:')
+        layout.addWidget(self.selected_chapters_label)
+        self.selected_chapters_list = QListWidget()
+        layout.addWidget(self.selected_chapters_list)
 
         self.submit_button = QPushButton('Submit')
         self.submit_button.clicked.connect(self.submit)
@@ -114,18 +131,18 @@ class InputWindow(QWidget):
 
     def submit(self):
         all_chapters = self.all_checkbox.isChecked()
-        start_chapter = int(self.start_input.text())
-        end_chapter = int(self.end_input.text())
-        self.result = (all_chapters, start_chapter, end_chapter)
+        start_chapter = self.start_combo.currentText()
+        end_chapter = self.end_combo.currentText()
+        self.result = [all_chapters, start_chapter, end_chapter]
         self.close()
 
-def chapter_selector():
+def chapter_selector(chapters):
     app = QApplication(sys.argv)
-    window = InputWindow()
+    window = ChapterSelectorWindow(chapters)
     window.show()
-    app.exec()
-    return window.result
-# chapter selector end
+    app.exec()        
+    return [window.result[0], chapters.index(window.result[1]), chapters.index(window.result[2])]
+#Chapter selector window end
 
 #image downloader
 def download_image(url, path, image_name):
@@ -193,18 +210,32 @@ def download_image(url, path, image_name):
     return False
 
 #function for number adding for easy sorting
-def chap_no(chap):
-    if len(chap[3:])==1:
-        return "0" + str(chap[3:])
+def chap_no(chap, name):
+    ch_no = re.findall(r'\d+', chap)
+    if len(ch_no) != 0:
+        if len(ch_no[0])==1:
+            return "0" + str(ch_no[0])
+        else:
+            return str(ch_no[0])
     else:
-        return str(chap[3:])
-    
-    
+        ind = name.index(chap)
+        cntr = 1 
+        if ind==0:
+            return "00"
+        else:
+            while len(re.findall(r'\d+', name[ind-cntr])) > 0:
+                cntr = cntr+1 
+                if ind-cntr == 0:
+                    break
+            return str(ind-cntr) + "_" + str(cntr)
+
+
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 url = get_user_input("Manga URL","Enter Batoto series link:")  # series directory
 
 
-links = get_links(url) #this will downalod every link from the above url
+links, chap_name = get_links(url) #this will downalod every link from the above url
+
 
 # to find chapter links
 filtered_links = []
@@ -218,19 +249,20 @@ for lnk in links:
                 
 filtered_links.sort()  #now we have all the chapter list
 
+
 path_list = [] # just storage for all the path
 
 loc = select_folder() # folder selector
 
 # let's ask user for how many chapter they want to downlaod
-Result = chapter_selector()
+Result = chapter_selector(chap_name)
 all_selected = Result[0]
 start_chapter = Result[1]
 end_chapter = Result[2]
 
 # for all chapter 
 if all_selected == False:
-    filtered_links = filtered_links[start_chapter -1:end_chapter-1]
+    filtered_links = filtered_links[start_chapter:end_chapter+1]
     
 #let's get image for the chapter
 for url_short in filtered_links:
@@ -290,7 +322,7 @@ for url_short in filtered_links:
         for file in pdf_files:
             merger.append(file)
     
-        with open(f"{loc}/{chap_no(chapter)} {replace_special_chars(series)} {replace_special_chars(chapter)}.pdf", 'wb') as f:
+        with open(f"{loc}/{chap_no(chapter, chap_name)} {replace_special_chars(series)} {replace_special_chars(chapter)}.pdf", 'wb') as f:
             merger.write(f)
         merger.close()
         f.close()
