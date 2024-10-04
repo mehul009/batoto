@@ -19,30 +19,110 @@ import urllib.request
 import wget
 import pycurl
 
+from Selenium_extractor import mangafire
+
+# to find which website is used
+def manga_web(url):
+    web = 0 # 1 = batoto; 2 = kissmanga; 3 = Manga fire; 99 = not supported
+    if "bato" in url:
+        web = 1 
+    elif "kissmanga" in url:
+        web = 2
+    elif "mangafire" in url:
+        web = 3
+    else:
+        web = 99
+    
+    return web
+
+#Html extractor
+def html_extract(soup, main, class_name = None):
+    if class_name is None:
+        return soup.find_all(main)
+    else:
+        return soup.find_all(main, class_=class_name)
+
+def cap_low(name_text, sym='-', lwr = True, spc_rmv = True):  # this is used to replace space with sym, and lower case of required, it will also remove space from frist and last
+    if lwr == True:
+        name_text = name_text.lower() # let's make it lower
+    else:
+        name_text = name_text
+    name_text = name_text.replace("\n", '') # let's remove \n
+    name_text = name_text.replace("\t", '') # let's remove \t
+    name_new = name_text
+    
+    if spc_rmv == True:
+        for i in name_text:  #this for loop will remove all initial and end space if any
+            if name_new[0]==' ':
+                name_new = name_new[1:len(name_new)]
+            elif name_new[len(name_new)-1:len(name_new)] == ' ':
+                name_new = name_new[:len(name_new)-1]
+            else:
+                name_new = name_new
+    
+    name_new = name_new.replace(" ", sym) # let's repalce spalce with sym
+    return name_new
+    
 #website extracter
 def get_links(url):  
     """
     Extract all links from a webpage
     """
+    #decide which manga uploader has been used
+    
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
     links = []
-    for link in soup.find_all('a'):
+    for link in soup.find_all('a'): # find all the links
         href = link.get('href')
         if link:
             links.append(link.get('href'))
             
-    episode_links = soup.find_all('a', class_='visited chapt')
     episode_list = [] 
     
-    for link in episode_links:
-        ls = link.get_text()
-        ls = ls[1:-1]
-        episode_list.append(ls)
-    
-    episode_list.reverse()
+    if manga_web(url) == 1: #if it is batoto
+        filtered_links = filterd_link(links, '/chapter/')
+        filtered_links.sort()
         
-    return links, episode_list
+        episode_links = html_extract(soup, 'a', 'visited_chapt') 
+        for link in episode_links:
+            ls = link.get_text()  # let's get text
+            ls = ls[1:-1]
+            episode_list.append(ls)
+        
+        episode_list.reverse()
+        name = html_extract(soup,'h3','item-title')
+        name_fun = name[0].get_text()
+        
+    elif manga_web(url) == 2: #if it is kiss manga
+        name = html_extract(soup, 'div', 'post-title') # this is series name for kiss manga
+        name = name[0].find('h1')
+        name_fun = name.text # let's get series name
+        name_text = cap_low(name_fun)
+        filtered_links = filterd_link(links, name_text+'/'+'chapter-')
+        filtered_links.sort()
+        
+        episode_links = html_extract(soup, 'li', 'wp-manga-chapter')
+        for link in episode_links:
+            ls_html = html_extract(link, 'a')
+            ls = cap_low(ls_html[0].get_text(), ' ', False)  # let's get text
+            episode_list.append(ls)
+        
+        episode_list.reverse()
+        
+    elif manga_web(url) == 3: #if it is manga fire
+        links = []
+        name_fun = html_extract(soup,'h1')[0].text  # chapter name
+        links_2 = html_extract(soup, 'li', 'item') #it will find only important links
+        links_2.reverse()
+        for lnk in links_2:
+            links.append('https://mangafire.to'+str(lnk.find_all('a')[0].get('href')))
+            episode_list.append(lnk.find_all('span')[0].text)
+        
+        filtered_links = links
+    
+
+    return filtered_links, episode_list, cap_low(replace_special_chars(name_fun), ' ', False, True) #last variable is series name
 
 #folder deleter after converted to pdf
 def delete_folder(folder_path, retries=3, delay=1):
@@ -80,7 +160,7 @@ def get_user_input(lbl, lbl2="input"):
 
 #special character remover for path
 def replace_special_chars(input_string):
-    special_characters = ["<", ">", ":", '"', "/", "\\", "|", "?", "*"]
+    special_characters = ["<", ">", ":", '"', "/", "\\", "|", "?", "*", ","]
     for char in special_characters:
         input_string = input_string.replace(char, '-')
     return input_string
@@ -98,44 +178,35 @@ class ChapterSelectorWindow(QWidget):
         self.chapters = chapters
         self.initUI()
         self.result = None
-
     def initUI(self):
         self.setWindowTitle('Chapter Selector')
         layout = QVBoxLayout()
-
         self.all_checkbox = QCheckBox('Include all chapters')
         layout.addWidget(self.all_checkbox)
-
         self.start_label = QLabel('Start chapter:')
         layout.addWidget(self.start_label)
         self.start_combo = QComboBox()
         self.start_combo.addItems([str(i) for i in self.chapters])
         layout.addWidget(self.start_combo)
-
         self.end_label = QLabel('End chapter:')
         layout.addWidget(self.end_label)
         self.end_combo = QComboBox()
         self.end_combo.addItems([str(i) for i in self.chapters])
         layout.addWidget(self.end_combo)
-
         self.selected_chapters_label = QLabel('Selected Chapters:')
         layout.addWidget(self.selected_chapters_label)
         self.selected_chapters_list = QListWidget()
         layout.addWidget(self.selected_chapters_list)
-
         self.submit_button = QPushButton('Submit')
         self.submit_button.clicked.connect(self.submit)
         layout.addWidget(self.submit_button)
-
         self.setLayout(layout)
-
     def submit(self):
         all_chapters = self.all_checkbox.isChecked()
         start_chapter = self.start_combo.currentText()
         end_chapter = self.end_combo.currentText()
         self.result = [all_chapters, start_chapter, end_chapter]
         self.close()
-
 def chapter_selector(chapters):
     app = QApplication(sys.argv)
     window = ChapterSelectorWindow(chapters)
@@ -229,26 +300,61 @@ def chap_no(chap, name):
                     break
             return str(ind-cntr) + "_" + str(cntr)
 
+#link filtering
+def filterd_link(links, argument):
+    filterd_lnk = []
+    #links = list(set(links))  #it removes all duplicates from the list
+    for lnk in links:
+        if lnk is not None:
+            if argument in lnk:
+                filterd_lnk.append(lnk)
+    
+    return filterd_lnk
+  
+def PDF_maker(loc, series, chapter, path_list, img_https_list): # let's make pdf from images
+    path = loc+ '/' + replace_special_chars(series)+' '+ replace_special_chars(chapter)
+    path_list.append(path)
+    
+    #let's make new folder for each chapter
+    os.makedirs(path, exist_ok=True)
+    
+    pdf_files = [] # PDF holder
+    name = 1 # image name holder
+    
+    for image_url in img_https_list:
+        image_name = str(name)
+        if download_image(image_url, path, image_name):
+            # Image downloaded successfully
+            with Image.open(f"{path}/{image_name}") as img:
+                img.save(f"{path}/{image_name}.pdf", 'PDF')
+                #img.close()
+        else:
+            # Image download failed, but a blank image with the URL was created
+            with Image.open(f"{path}/{image_name}") as img:
+                img.save(f"{path}/{image_name}.pdf", 'PDF')
+                #img.close()
+    
+        name += 1
+        with Image.open(f"{path}/{image_name}") as image:
+            image.save(f"{path}/{image_name}.pdf", 'PDF')
+            pdf_files.append(f"{path}/{image_name}.pdf")
+            #image.close()
+        
+        merger = PdfMerger()
+        for file in pdf_files:
+            merger.append(file)
+    
+        with open(f"{loc}/{chap_no(chapter, chap_name)} {replace_special_chars(series)} {replace_special_chars(chapter)}.pdf", 'wb') as f:
+            merger.write(f)
+        merger.close()
+        f.close()
+    return path_list
+    
+ImageFile.LOAD_TRUNCATED_IMAGES = True #if image are not proper it will just help to carry on
 
-ImageFile.LOAD_TRUNCATED_IMAGES = True
-url = get_user_input("Manga URL","Enter Batoto series link:")  # series directory
+url = get_user_input("Manga URL","Enter link:")  # series directory
 
-
-links, chap_name = get_links(url) #this will downalod every link from the above url
-
-
-# to find chapter links
-filtered_links = []
-for lnk in links:
-    if lnk is not None: 
-        indices = [i for i, c in enumerate(lnk) if c == "/"]
-        if len(indices) == 2:
-            substrings = lnk.split("/")
-            if substrings[1] == 'chapter':
-                filtered_links.append(lnk)
-                
-filtered_links.sort()  #now we have all the chapter list
-
+filtered_links, chap_name, series = get_links(url) #this will downalod every link from the above url
 
 path_list = [] # just storage for all the path
 
@@ -265,67 +371,56 @@ if all_selected == False:
     filtered_links = filtered_links[start_chapter:end_chapter+1]
     
 #let's get image for the chapter
-for url_short in filtered_links:
-    url = "https://bato.to"+url_short
-    response = requests.get(url)
-    page_content = response.content
-    soup = BeautifulSoup(page_content, "html.parser") #let's make a soup of html page
-    script_tags = soup.find_all('script')
-    
-    # let's find url for img and series and chapter name
-    for scrpt in script_tags:
-        img_https_match = re.search(r'imgHttps\s*=\s*(\[[^\]]+\])', scrpt.text)
-        if img_https_match:
-            img_https_value = img_https_match.group(1)
-            img_https_list = eval(img_https_value)  # Convert string to list
+img_https_list = [] # just storing for img https_list
+if manga_web(url) == 1: #if it is batoto
+    for url_short in filtered_links:
+        url_bt = "https://bato.to"+url_short
+        response = requests.get(url_bt)
+        page_content = response.content
+        soup = BeautifulSoup(page_content, "html.parser") #let's make a soup of html page
+        script_tags = soup.find_all('script')
+        
+        # let's find url for img and series and chapter name
+        for scrpt in script_tags:
+            img_https_match = re.search(r'imgHttps\s*=\s*(\[[^\]]+\])', scrpt.text)
+            if img_https_match:
+                img_https_value = img_https_match.group(1)
+                img_https_list = eval(img_https_value)  # Convert string to list
+                
+            local_text_sub_match = re.search(r'local_text_sub\s*=\s*(\'[^\']+\')', scrpt.text)
+            local_text_epi_match = re.search(r'local_text_epi\s*=\s*(\'[^\']+\')', scrpt.text)
+        
+            if local_text_sub_match and local_text_epi_match:
+                local_text_epi_value = local_text_epi_match.group(1)
+                # Remove the surrounding quotes
+                chapter = local_text_epi_value[1:-1]
+                
+        path_list = PDF_maker(loc, series, chapter, path_list, img_https_list) #download image and also store path
+                
+elif manga_web(url) == 2: #if it is kissmanga
+    for url_short in filtered_links:
+        url_bt = url_short
+        response = requests.get(url_bt)
+        page_content = response.content
+        soup = BeautifulSoup(page_content, "html.parser")
+        links = []
+        for link in soup.find_all('img','wp-manga-chapter-img'): # find all the links
+            src = link.get('src')
+            if link:
+                links.append(link.get('src'))
+        links = filterd_link(links, 'WP-manga/data')
+        for lnk in links:
+            img_https_list.append(cap_low(lnk,' ', False, False))
             
-        local_text_sub_match = re.search(r'local_text_sub\s*=\s*(\'[^\']+\')', scrpt.text)
-        local_text_epi_match = re.search(r'local_text_epi\s*=\s*(\'[^\']+\')', scrpt.text)
-    
-        if local_text_sub_match and local_text_epi_match:
-            local_text_sub_value = local_text_sub_match.group(1)
-            local_text_epi_value = local_text_epi_match.group(1)
+        chap = html_extract(soup,'li','active')
+        chapter = cap_low(chap[0].get_text(), ' ', False, True)
         
-            # Remove the surrounding quotes
-            series = local_text_sub_value[1:-1]
-            chapter = local_text_epi_value[1:-1]
-        
-    path = loc+ '/' + replace_special_chars(series)+' '+ replace_special_chars(chapter)
-    path_list.append(path)
-    
-    #let's make new folder for each chapter
-    os.makedirs(path, exist_ok=True)
-    
-    pdf_files = [] # PDF holder
-    name = 1 # image name holder
-    
-    for image_url in img_https_list:
-        image_name = str(name)
-        if download_image(image_url, path, image_name):
-            # Image downloaded successfully
-            with Image.open(f"{path}/{image_name}") as img:
-                img.save(f"{path}/{image_name}.pdf", 'PDF')
-                img.close()
-        else:
-            # Image download failed, but a blank image with the URL was created
-            with Image.open(f"{path}/{image_name}") as img:
-                img.save(f"{path}/{image_name}.pdf", 'PDF')
-                img.close()
-    
-        name += 1
-        with Image.open(f"{path}/{image_name}") as image:
-            image.save(f"{path}/{image_name}.pdf", 'PDF')
-            pdf_files.append(f"{path}/{image_name}.pdf")
-            image.close()
-        
-        merger = PdfMerger()
-        for file in pdf_files:
-            merger.append(file)
-    
-        with open(f"{loc}/{chap_no(chapter, chap_name)} {replace_special_chars(series)} {replace_special_chars(chapter)}.pdf", 'wb') as f:
-            merger.write(f)
-        merger.close()
-        f.close()
+        path_list = PDF_maker(loc, series, chapter, path_list, img_https_list) #download image and also store path
+elif manga_web(url) == 3: #if it is manga fire
+    for url_short in filtered_links:
+        img_https_list, chapter = mangafire(url_short)        
+        path_list = PDF_maker(loc, series, chapter, path_list, img_https_list)
+            
     
 #this require some updates
 for path in path_list:
