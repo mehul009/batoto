@@ -108,9 +108,24 @@ def get_links(url):
             episode_list.append(lnk.find_all('span')[0].text)
         
         filtered_links = links
-    
-
-    return filtered_links, episode_list, cap_low(replace_special_chars(name_fun), ' ', False, True) #last variable is series name
+        
+    elif manga_web(url)==7: #if it is mangaberry
+        links = []
+        episode_list = []
+        filtered_links = []
+        series = html_extract(soup,'h1')[0].text
+        series = cap_low(series)
+        
+        chap_links = html_extract(soup, 'a', 'link no-decoration')
+        
+        for lnk in chap_links:
+            if series+'/' in lnk.get('href'):
+                filtered_links.append(lnk.get('href'))
+                episode_list.append(cap_low(lnk.text))
+        
+        filtered_links.reverse()
+        episode_list.reverse()
+    return filtered_links, episode_list, cap_low(html_extract(soup,'h1')[0].text,sym=' ', lwr=False, spc_rmv=False) #last variable is series name
 
 #folder deleter after converted to pdf
 def delete_folder(folder_path, retries=3, delay=1):

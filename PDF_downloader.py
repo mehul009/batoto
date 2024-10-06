@@ -185,6 +185,38 @@ elif manga_web(url) == 6: # if if is platinumscans
         path_list = PDF_maker(loc, series, chapter_name[i], path_list, img_https_list, chap_name)
         i = i + 1
 
+elif manga_web(url) == 7: # if it is mangaberri
+    
+    filtered_links, chap_name, series = get_links(url)
+    loc = select_folder() # folder selector
+
+    # let's ask user for how many chapter they want to downlaod
+    Result = chapter_selector(chap_name)
+    all_selected = Result[0]
+    start_chapter = Result[1]
+    end_chapter = Result[2]
+    
+    chapter_name = chap_name
+    if all_selected == False:
+        filtered_links = filtered_links[start_chapter:end_chapter+1]
+        chapter_name = chapter_name[start_chapter:end_chapter+1]
+    
+    i = 0
+    for lnk in filtered_links:
+        url = 'https://mangaberri.com/' + lnk
+        response = requests.get(url)
+        page_content = response.content
+        soup = BeautifulSoup(page_content, "html.parser")
+        img_links = html_extract(soup,'img')
+        img_list=[]
+        for img in img_links:
+            if img.get('title') == series:
+                img_list.append(img.get('src'))
+                
+        path_list = PDF_maker(loc, series, chapter_name[i], path_list, img_list, chap_name)
+        i = i + 1
+                
+
 
 #let's delet trash
 for path in path_list:

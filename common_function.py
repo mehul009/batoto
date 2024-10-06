@@ -35,6 +35,8 @@ def manga_web(url):
         web = 5
     elif "platinumscans" in url:
         web = 6
+    elif "mangaberri" in url:
+        web = 7
     else:
         web = 99
     
