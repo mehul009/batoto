@@ -175,7 +175,7 @@ def mangasub_chap(url):
         chap_links.append(img_element.get_attribute('href'))
         chap_name.append(img_element.text)
     
-    chap_name, chap_links = sorter(chap_name,chap_links)
+    #chap_name, chap_links = sorter(chap_name,chap_links)
     
     driver.quit()
     return chap_links, chap_name, series
@@ -212,5 +212,82 @@ def mangasub_img(url):
     
     driver.quit()            
     return img_list
+
+
+def platinumscan_chap(url):
+    driver = load_firefox(url)
+    chap_name = WebDriverWait(driver, 30).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, '.post-title'))
+    )
+    series = chap_name.text
+    
+    chap_links = []
+    chap_name = []
+    
+    show_more_button = (By.CSS_SELECTOR, 'span.btn.btn-link.chapter-readmore.less-chap') # let's find show more button
+    
+    try:  # let's click on show more button till everything is loaded
+        while True: 
+            # Wait for the 'Show more' button to be clickable
+            WebDriverWait(driver, 1).until(EC.element_to_be_clickable(show_more_button))
+
+            # Click the 'Show more' button
+            driver.find_element(*show_more_button).click()
+
+            # You can add a delay here if needed
+            time.sleep(2)
+    except Exception as e:
+        print("All chapter loaded.")
+    
+    elements = driver.find_elements(By.CSS_SELECTOR, 'li.wp-manga-chapter')
+    
+    for element in elements:
+        img_element = element.find_element(By.CSS_SELECTOR, 'a')
+        chap_links.append(img_element.get_attribute('href'))
+        chap_name.append(img_element.text)
+    
+    #chap_name, chap_links = sorter(chap_name,chap_links)
+    
+    driver.quit()
+    chap_name.reverse()
+    chap_links.reverse()
+    
+    return chap_links, chap_name, series
+
+def platinumscan_img(url):
+    img_list = []
+    
+    driver = load_firefox(url+'?style=paged') # let's load url in fire fox
+    
+    page_element = driver.find_elements(By.CSS_SELECTOR, 'div.c-selectpicker.selectpicker_page')
+    
+    total_page = len(page_element[1].text.split('\n'))
+    
+    img_element = driver.find_elements(By.CSS_SELECTOR,'img')
+    
+    for img in img_element:
+        lnk = img.get_attribute('src')
+        if '/WP-manga/data' in lnk:
+            img_list.append(lnk)
+            
+    next_button = WebDriverWait(driver, 30).until(
+        EC.element_to_be_clickable((By.XPATH, '/html/body/div[1]/div/div/div/div/div/div/div/div/div[1]/div[1]/div/div[3]/div[2]/div[2]/a'))
+    )
+    for _ in range(total_page - 1):
+        next_button.click()
+        time.sleep(1)  # Wait for the page to load
+        
+        img_element = driver.find_elements(By.CSS_SELECTOR,'img')
+        
+        for img in img_element:
+            lnk = img.get_attribute('src')
+            if '/WP-manga/data' in lnk:
+                img_list.append(lnk)
+    
+    driver.quit()            
+    return img_list
+
+
+
 
     

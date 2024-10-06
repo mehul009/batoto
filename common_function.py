@@ -10,7 +10,7 @@ def sorter (Series1, Series2):
     pairs = list(zip(Series1, Series2))
 
     # Sort the pairs based on the values in Series1
-    sorted_pairs = sorted(pairs, key=lambda x: x[0])
+    sorted_pairs = sorted(pairs, key=lambda x: (len(str(x[0])), x[0]))
 
     # Unzip the sorted pairs back into two separate lists
     sorted_Series1, sorted_Series2 = zip(*sorted_pairs)
@@ -22,7 +22,7 @@ def sorter (Series1, Series2):
 
 # to find which website is used
 def manga_web(url):
-    web = 0 # 1 = batoto; 2 = kissmanga; 3 = Manga fire; 4 = mangadex; 5 = mangasub; 99 = not supported
+    web = 0 # 1 = batoto; 2 = kissmanga; 3 = Manga fire; 4 = mangadex; 5 = mangasub; 6= platinum scan, 99 = not supported
     if "bato" in url:
         web = 1 
     elif "kissmanga" in url:
@@ -33,6 +33,8 @@ def manga_web(url):
         web = 4
     elif "mangasub" in url:
         web = 5
+    elif "platinumscans" in url:
+        web = 6
     else:
         web = 99
     

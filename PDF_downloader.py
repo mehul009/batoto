@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 import re
 from PIL import ImageFile
 
-from Selenium_extractor import mangafire, mangadex_chap, mangasub_chap, mangasub_img
+from Selenium_extractor import mangafire, mangadex_chap, mangasub_chap, mangasub_img, platinumscan_chap, platinumscan_img
 
 from beautifulsoup_extracter import html_extract, cap_low, get_links, delete_folder, get_user_input, select_folder, chapter_selector, filterd_link, PDF_maker
 
@@ -161,6 +161,29 @@ elif manga_web(url) == 5:  #if it is mangasub
         path_list = PDF_maker(loc, series, chapter_name[i], path_list, img_https_list, chap_name)
         i = i + 1
 
+elif manga_web(url) == 6: # if if is platinumscans
+    filtered_links, chap_name, series = platinumscan_chap(url)
+    
+    loc = select_folder() # folder selector
+    
+    # let's ask user for how many chapter they want to downlaod
+    Result = chapter_selector(chap_name)
+    all_selected = Result[0]
+    start_chapter = Result[1]
+    end_chapter = Result[2]
+    
+    chapter_name = chap_name
+    
+    # for all chapter 
+    if all_selected == False:
+        filtered_links = filtered_links[start_chapter:end_chapter+1]
+        chapter_name = chapter_name[start_chapter:end_chapter+1]
+    
+    i = 0
+    for lnk in filtered_links:
+        img_https_list = platinumscan_img(lnk)
+        path_list = PDF_maker(loc, series, chapter_name[i], path_list, img_https_list, chap_name)
+        i = i + 1
 
 
 #let's delet trash
