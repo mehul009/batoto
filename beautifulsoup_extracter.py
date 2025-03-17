@@ -7,20 +7,15 @@ Created on Fri Oct  4 15:54:30 2024
 
 import requests
 from bs4 import BeautifulSoup
-import re
 import os
-from PIL import Image, ImageDraw, ImageFont, ImageFile
+from PIL import Image, ImageDraw, ImageFont
 from PyPDF2 import PdfMerger
-import shutil
-from PyQt5.QtWidgets import QApplication, QInputDialog, QFileDialog, QWidget, QPushButton, QLabel, QLineEdit, QVBoxLayout, QCheckBox, QListWidget, QComboBox
-import sys
 import time
 import urllib.request
 import wget
 import pycurl
 
-from Selenium_extractor import mangafire
-from common_function import manga_web
+from common_function import manga_web, cap_low, replace_special_chars, chap_no, filterd_link
 
 
 #Html extractor
@@ -29,28 +24,7 @@ def html_extract(soup, main, class_name = None):
         return soup.find_all(main)
     else:
         return soup.find_all(main, class_=class_name)
-
-def cap_low(name_text, sym='-', lwr = True, spc_rmv = True):  # this is used to replace space with sym, and lower case of required, it will also remove space from frist and last
-    if lwr == True:
-        name_text = name_text.lower() # let's make it lower
-    else:
-        name_text = name_text
-    name_text = name_text.replace("\n", '') # let's remove \n
-    name_text = name_text.replace("\t", '') # let's remove \t
-    name_new = name_text
-    
-    if spc_rmv == True:
-        for i in name_text:  #this for loop will remove all initial and end space if any
-            if name_new[0]==' ':
-                name_new = name_new[1:len(name_new)]
-            elif name_new[len(name_new)-1:len(name_new)] == ' ':
-                name_new = name_new[:len(name_new)-1]
-            else:
-                name_new = name_new
-    
-    name_new = name_new.replace(" ", sym) # let's repalce spalce with sym
-    return name_new
-    
+   
 #website extracter
 def get_links(url):  
     """
@@ -72,7 +46,7 @@ def get_links(url):
         filtered_links = filterd_link(links, '/chapter/')
         filtered_links.sort()
         
-        episode_links = html_extract(soup, 'a', 'visited_chapt') 
+        episode_links = html_extract(soup, 'a', 'visited chapt') 
         for link in episode_links:
             ls = link.get_text()  # let's get text
             ls = ls[1:-1]
@@ -81,6 +55,8 @@ def get_links(url):
         episode_list.reverse()
         name = html_extract(soup,'h3','item-title')
         name_fun = name[0].get_text()
+        
+        chap_name_final = cap_low(html_extract(soup,'h3')[0].text,sym=' ', lwr=False, spc_rmv=False)
         
     elif manga_web(url) == 2: #if it is kiss manga
         name = html_extract(soup, 'div', 'post-title') # this is series name for kiss manga
@@ -109,6 +85,8 @@ def get_links(url):
         
         filtered_links = links
         
+        chap_name_final = html_extract(soup, 'title')[0].text
+        
     elif manga_web(url)==7: #if it is mangaberry
         links = []
         episode_list = []
@@ -125,98 +103,8 @@ def get_links(url):
         
         filtered_links.reverse()
         episode_list.reverse()
-    return filtered_links, episode_list, cap_low(html_extract(soup,'h1')[0].text,sym=' ', lwr=False, spc_rmv=False) #last variable is series name
-
-#folder deleter after converted to pdf
-def delete_folder(folder_path, retries=3, delay=1):
-    # This is to delete all the files at the end
-    if os.path.exists(folder_path):
-        for attempt in range(retries):
-            try:
-                shutil.rmtree(folder_path)
-                print(f"Folder '{folder_path}' and its contents have been deleted.")
-                break
-            except PermissionError as e:
-                print(f"Attempt {attempt + 1} failed: {e}")
-                time.sleep(delay)
-        else:
-            print(f"Failed to delete folder '{folder_path}' after {retries} attempts.")
-    else:
-        print(f"Folder '{folder_path}' does not exist.")
-
-#URL asker
-def get_user_input(lbl, lbl2="input"):
-    app = QApplication(sys.argv)
-    
-    # Create a QLineEdit for user input
-    input_field = QLineEdit()
-    
-    # Open a dialog box to get user input
-    input_text, ok = QInputDialog.getText(None, lbl, lbl2, QLineEdit.EchoMode.Normal, input_field.text())
-    
-    if ok:
-        # Return the user input
-        return input_text
-    else:
-        # If user cancels, return None
-        return None
-
-#special character remover for path
-def replace_special_chars(input_string):
-    special_characters = ["<", ">", ":", '"', "/", "\\", "|", "?", "*", ","]
-    for char in special_characters:
-        input_string = input_string.replace(char, '-')
-    return input_string
-
-#output folder selector
-def select_folder():
-    app = QApplication(sys.argv)
-    folder_path = QFileDialog.getExistingDirectory()
-    return folder_path
-
-#Chapter selector window start
-class ChapterSelectorWindow(QWidget):
-    def __init__(self, chapters):
-        super().__init__()
-        self.chapters = chapters
-        self.initUI()
-        self.result = None
-    def initUI(self):
-        self.setWindowTitle('Chapter Selector')
-        layout = QVBoxLayout()
-        self.all_checkbox = QCheckBox('Include all chapters')
-        layout.addWidget(self.all_checkbox)
-        self.start_label = QLabel('Start chapter:')
-        layout.addWidget(self.start_label)
-        self.start_combo = QComboBox()
-        self.start_combo.addItems([str(i) for i in self.chapters])
-        layout.addWidget(self.start_combo)
-        self.end_label = QLabel('End chapter:')
-        layout.addWidget(self.end_label)
-        self.end_combo = QComboBox()
-        self.end_combo.addItems([str(i) for i in self.chapters])
-        layout.addWidget(self.end_combo)
-        self.selected_chapters_label = QLabel('Selected Chapters:')
-        layout.addWidget(self.selected_chapters_label)
-        self.selected_chapters_list = QListWidget()
-        layout.addWidget(self.selected_chapters_list)
-        self.submit_button = QPushButton('Submit')
-        self.submit_button.clicked.connect(self.submit)
-        layout.addWidget(self.submit_button)
-        self.setLayout(layout)
-    def submit(self):
-        all_chapters = self.all_checkbox.isChecked()
-        start_chapter = self.start_combo.currentText()
-        end_chapter = self.end_combo.currentText()
-        self.result = [all_chapters, start_chapter, end_chapter]
-        self.close()
-def chapter_selector(chapters):
-    app = QApplication(sys.argv)
-    window = ChapterSelectorWindow(chapters)
-    window.show()
-    app.exec()        
-    return [window.result[0], chapters.index(window.result[1]), chapters.index(window.result[2])]
-#Chapter selector window end
+        
+    return filtered_links, episode_list, chap_name_final #last variable is series name
 
 #image downloader
 def download_image(url, path, image_name):
@@ -282,37 +170,6 @@ def download_image(url, path, image_name):
     img.save(f"{path}/{image_name}")
 
     return False
-
-#function for number adding for easy sorting
-def chap_no(chap, name):
-    ch_no = re.findall(r'\d+', chap)
-    if len(ch_no) != 0:
-        if len(ch_no[0])==1:
-            return "0" + str(ch_no[0])
-        else:
-            return str(ch_no[0])
-    else:
-        ind = name.index(chap)
-        cntr = 1 
-        if ind==0:
-            return "00"
-        else:
-            while len(re.findall(r'\d+', name[ind-cntr])) > 0:
-                cntr = cntr+1 
-                if ind-cntr == 0:
-                    break
-            return str(ind-cntr) + "_" + str(cntr)
-
-#link filtering
-def filterd_link(links, argument):
-    filterd_lnk = []
-    #links = list(set(links))  #it removes all duplicates from the list
-    for lnk in links:
-        if lnk is not None:
-            if argument in lnk:
-                filterd_lnk.append(lnk)
-    
-    return filterd_lnk
   
 def PDF_maker(loc, series, chapter, path_list, img_https_list, chap_name): # let's make pdf from images
     path = loc+ '/' + replace_special_chars(series)+' '+ replace_special_chars(chapter)

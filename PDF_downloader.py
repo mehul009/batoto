@@ -12,9 +12,11 @@ from PIL import ImageFile
 
 from Selenium_extractor import mangafire, mangadex_chap, mangasub_chap, mangasub_img, platinumscan_chap, platinumscan_img
 
-from beautifulsoup_extracter import html_extract, cap_low, get_links, delete_folder, get_user_input, select_folder, chapter_selector, filterd_link, PDF_maker
+from beautifulsoup_extracter import html_extract, cap_low, get_links,  PDF_maker
 
-from common_function import manga_web
+from common_function import manga_web, delete_folder, filterd_link
+
+from GUI import show_warning, get_user_input, select_folder, chapter_selector
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True #if image are not proper it will just help to carry on
 
@@ -34,15 +36,23 @@ if manga_web(url) == 1: #if it is batoto
     all_selected = Result[0]
     start_chapter = Result[1]
     end_chapter = Result[2]
+    
+    if start_chapter > end_chapter:
+        temp = start_chapter
+        start_chapter = end_chapter
+        end_chapter = temp
 
     # for all chapter 
     if all_selected == False:
         filtered_links = filtered_links[start_chapter:end_chapter+1]
         
+    
+    total_chap = len(filtered_links)
+    print(f"Total {total_chap}  files will be downloaded.")
         
     for url_short in filtered_links:
-        url_bt = "https://bato.to"+url_short
-        response = requests.get(url_bt)
+        url_bt = "https://batocomic.com"+url_short
+        response = requests.get(url_bt, allow_redirects=True, timeout=10)
         page_content = response.content
         soup = BeautifulSoup(page_content, "html.parser") #let's make a soup of html page
         script_tags = soup.find_all('script')
@@ -63,7 +73,10 @@ if manga_web(url) == 1: #if it is batoto
                 chapter = local_text_epi_value[1:-1]
                 
         path_list = PDF_maker(loc, series, chapter, path_list, img_https_list, chap_name) #download image and also store path
-                
+        
+        print(f"{chapter} has been printed.")
+        total_chap = total_chap - 1
+        print(f"{total_chap} files are yet to be download.")        
 elif manga_web(url) == 2: #if it is kissmanga
     filtered_links, chap_name, series = get_links(url) #this will downalod every link from the above url
 
@@ -74,6 +87,11 @@ elif manga_web(url) == 2: #if it is kissmanga
     all_selected = Result[0]
     start_chapter = Result[1]
     end_chapter = Result[2]
+    
+    if start_chapter > end_chapter:
+        temp = start_chapter
+        start_chapter = end_chapter
+        end_chapter = temp
 
     # for all chapter 
     if all_selected == False:
@@ -109,6 +127,11 @@ elif manga_web(url) == 3: #if it is manga fire
     all_selected = Result[0]
     start_chapter = Result[1]
     end_chapter = Result[2]
+    
+    if start_chapter > end_chapter:
+        temp = start_chapter
+        start_chapter = end_chapter
+        end_chapter = temp
 
     # for all chapter 
     if all_selected == False:
@@ -129,6 +152,11 @@ elif manga_web(url) == 4:  #if it is manga dex
     all_selected = Result[0]
     start_chapter = Result[1]
     end_chapter = Result[2]
+    
+    if start_chapter > end_chapter:
+        temp = start_chapter
+        start_chapter = end_chapter
+        end_chapter = temp
 
     # for all chapter 
     if all_selected == False:
@@ -147,6 +175,11 @@ elif manga_web(url) == 5:  #if it is mangasub
     all_selected = Result[0]
     start_chapter = Result[1]
     end_chapter = Result[2]
+    
+    if start_chapter > end_chapter:
+        temp = start_chapter
+        start_chapter = end_chapter
+        end_chapter = temp
     
     chapter_name = chap_name
     
@@ -172,6 +205,11 @@ elif manga_web(url) == 6: # if if is platinumscans
     start_chapter = Result[1]
     end_chapter = Result[2]
     
+    if start_chapter > end_chapter:
+        temp = start_chapter
+        start_chapter = end_chapter
+        end_chapter = temp
+    
     chapter_name = chap_name
     
     # for all chapter 
@@ -196,6 +234,11 @@ elif manga_web(url) == 7: # if it is mangaberri
     start_chapter = Result[1]
     end_chapter = Result[2]
     
+    if start_chapter > end_chapter:
+        temp = start_chapter
+        start_chapter = end_chapter
+        end_chapter = temp
+    
     chapter_name = chap_name
     if all_selected == False:
         filtered_links = filtered_links[start_chapter:end_chapter+1]
@@ -215,8 +258,10 @@ elif manga_web(url) == 7: # if it is mangaberri
                 
         path_list = PDF_maker(loc, series, chapter_name[i], path_list, img_list, chap_name)
         i = i + 1
-                
-
+               
+else:
+    warning = 'This website is not yet supported.'
+    show_warning(warning)
 
 #let's delet trash
 for path in path_list:
