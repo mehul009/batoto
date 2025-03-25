@@ -44,7 +44,6 @@ def get_links(url):
     
     if manga_web(url) == 1: #if it is batoto
         filtered_links = filterd_link(links, '/chapter/')
-        filtered_links.sort()
         
         episode_links = html_extract(soup, 'a', 'visited chapt') 
         for link in episode_links:
@@ -52,11 +51,15 @@ def get_links(url):
             ls = ls[1:-1]
             episode_list.append(ls)
         
-        episode_list.reverse()
+        
         name = html_extract(soup,'h3','item-title')
         name_fun = name[0].get_text()
         
         chap_name_final = cap_low(html_extract(soup,'h3')[0].text,sym=' ', lwr=False, spc_rmv=False)
+        
+        episode_list.reverse()
+        filtered_links.reverse()
+        
         
     elif manga_web(url) == 2: #if it is kiss manga
         name = html_extract(soup, 'div', 'post-title') # this is series name for kiss manga
@@ -103,6 +106,8 @@ def get_links(url):
         
         filtered_links.reverse()
         episode_list.reverse()
+        
+    
         
     return filtered_links, episode_list, chap_name_final #last variable is series name
 

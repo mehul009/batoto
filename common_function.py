@@ -74,13 +74,13 @@ def delete_folder(folder_path, retries=3, delay=1):
         for attempt in range(retries):
             try:
                 shutil.rmtree(folder_path)
-                print(f"Folder '{folder_path}' and its contents have been deleted.")
+                print(f"Residual files from '{folder_path}' is deleted.")
                 break
             except PermissionError as e:
                 print(f"Attempt {attempt + 1} failed: {e}")
                 time.sleep(delay)
         else:
-            print(f"Failed to delete folder '{folder_path}' after {retries} attempts.")
+            print(f"Failed to delete folder '{folder_path}' after {retries} attempts. Please manually delet residul files of this folder.")
     else:
         print(f"Folder '{folder_path}' does not exist.")
         

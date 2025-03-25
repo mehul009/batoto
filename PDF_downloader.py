@@ -28,7 +28,7 @@ path_list = []  #just for storing paths
 if manga_web(url) == 1: #if it is batoto
 
     filtered_links, chap_name, series = get_links(url) #this will downalod every link from the above url
-
+    all_links = filtered_links
     loc = select_folder() # folder selector
 
     # let's ask user for how many chapter they want to downlaod
@@ -74,7 +74,7 @@ if manga_web(url) == 1: #if it is batoto
                 
         path_list = PDF_maker(loc, series, chapter, path_list, img_https_list, chap_name) #download image and also store path
         
-        print(f"{chapter} has been printed.")
+        print(f"{chapter} has been saved.")
         total_chap = total_chap - 1
         print(f"{total_chap} files are yet to be download.")        
 elif manga_web(url) == 2: #if it is kissmanga
