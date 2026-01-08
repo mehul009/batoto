@@ -1,3 +1,8 @@
+### No longer miantained and will not work with new updates in bato website
+
+### Use below software for latest updates.
+https://github.com/Yui007/bato_downloader
+
 ### this is strictly for education purpose only
 Go to the dist folder to find executables.
 No need to have python installed on your system, executables will work stand alone.
